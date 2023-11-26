@@ -1,4 +1,4 @@
 structure Main =
 struct
-  val main = Debug.debug_tokenize
+  val main = Debug.debug_parser
 end

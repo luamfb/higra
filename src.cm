@@ -1,6 +1,8 @@
 Library
     structure Token
     structure Lexer
+    structure Ast
+    structure Parser
     structure Debug
     structure Main
 is
@@ -9,3 +11,4 @@ is
     main.sml
     debug.sml
     lexer.sml
+    parser.sml
