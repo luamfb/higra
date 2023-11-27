@@ -1,7 +1,11 @@
 Library
     structure Token
     structure Lexer
+    structure Debug
+    structure Main
 is
     $/basis.cm
     $/smlnj-lib.cm
+    main.sml
+    debug.sml
     lexer.sml
