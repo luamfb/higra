@@ -11,7 +11,7 @@ fun find_value_of (s : string) ([] : (string * 'a) list) : 'a option = NONE
         find_value_of s rest
 
 structure Sema = struct
-  exception SemaError (* TODO store position here by traversing AST *)
+  exception SemaError of Token.SourcePos * Token.SourcePos
 
   datatype Shape = Circle | Rect
   datatype EdgeType = Cont
@@ -48,70 +48,75 @@ structure Sema = struct
     | sema_edge_type (Ast.DottedDirEdge _) = DottedDir
 
   fun lit_num (Ast.LitNum (n, _)) : int = n
-    | lit_num _ = raise SemaError
+    | lit_num lit = raise SemaError (Ast.literal_range lit)
 
   fun lit_str (Ast.LitStr (s, _)) : string = s
-    | lit_str _ = raise SemaError
+    | lit_str lit = raise SemaError (Ast.literal_range lit)
 
   fun lit_bool (Ast.LitBool (b, _)) : bool = b
-    | lit_bool _ = raise SemaError
+    | lit_bool lit = raise SemaError (Ast.literal_range lit)
 
   fun lit_color (Ast.LitColor (c, _)) : Color = c
-    | lit_color _ = raise SemaError
+    | lit_color lit = raise SemaError (Ast.literal_range lit)
 
-  fun choose_non_def v1 v2 v_def =
+  fun choose_non_def v1 v2 v_def range =
     if v2 = v_def then
       v1
     else if v1 = v_def then
       v2
     else
-      raise SemaError
+      raise SemaError range
 
   fun edge_attr (Ast.Attr [((Ast.Id ("color", _)), lit)]) = lit_color lit
-    | edge_attr _ = raise SemaError
+    | edge_attr attr = raise SemaError (Ast.attr_range attr)
 
-  fun fig_attr (Ast.Attr []) : FigAttrib = fig_defaults
-    | fig_attr (Ast.Attr [(Ast.Id ("font", _), lit)]) =
-    (lit_str lit, default_horiz)
-    | fig_attr (Ast.Attr [(Ast.Id ("horiz", _), lit)]) =
-    (default_font, lit_bool lit)
-    | fig_attr (Ast.Attr [(_, _)]) = raise SemaError
-    | fig_attr (Ast.Attr ((id, lit)::rest)) =
-    let
-      val (font0, horiz0) = fig_attr (Ast.Attr [(id, lit)])
-      val (font1, horiz1) = fig_attr (Ast.Attr rest)
-      val font = choose_non_def font0 font1 default_font
-      val horiz = choose_non_def horiz0 horiz1 default_horiz
-    in
-      (font, horiz)
-    end
+  fun fig_attr (Ast.Attr name_val) : FigAttrib =
+    case name_val of
+         [] => fig_defaults
+       | [(Ast.Id ("font", _), lit)] => (lit_str lit, default_horiz)
+       | [(Ast.Id ("horiz", _), lit)] => (default_font, lit_bool lit)
+       | [(_, _)] =>
+           raise SemaError (Ast.attr_range (Ast.Attr name_val))
+       | (id, lit)::rest =>
+           let
+             val (font0, horiz0) = fig_attr (Ast.Attr [(id, lit)])
+             val (font1, horiz1) = fig_attr (Ast.Attr rest)
+             val range = Ast.attr_range (Ast.Attr name_val)
+             val font = choose_non_def font0 font1 default_font range
+             val horiz = choose_non_def horiz0 horiz1 default_horiz range
+           in
+             (font, horiz)
+           end
 
-  fun vertex_attr (Ast.Attr []) : VertexAttrib = vertex_defaults
-    | vertex_attr (Ast.Attr [(Ast.Id ("color", _), lit)]) =
-    (lit_color lit, default_shape, default_size)
-    | vertex_attr (Ast.Attr [(Ast.Id ("fontsize", _), lit)]) =
-    (default_color, default_shape, lit_num lit)
+  fun vertex_attr (Ast.Attr name_val) : VertexAttrib =
+    case name_val of
+         [] => vertex_defaults
+       | [(Ast.Id ("color", _), lit)] =>
+           (lit_color lit, default_shape, default_size)
+       | [(Ast.Id ("fontsize", _), lit)] =>
+           (default_color, default_shape, lit_num lit)
+       | [(Ast.Id("shape", _), Ast.LitStr("circle", _))] =>
+           (default_color, Circle, default_size)
+       | [(Ast.Id("shape", _), Ast.LitStr("rect", _))] =>
+           (default_color, Rect, default_size)
+       | [(_, _)] =>
+           raise SemaError (Ast.attr_range (Ast.Attr name_val))
+       | ((id, lit)::rest) =>
+           let
+             val (color0, shape0, size0) = vertex_attr (Ast.Attr [(id,lit)])
+             val (color1, shape1, size1) = vertex_attr (Ast.Attr rest)
+             val range = Ast.attr_range (Ast.Attr name_val)
+             val color = choose_non_def color0 color1 default_color range
+             val shape = choose_non_def shape0 shape1 default_shape range
+             val size = choose_non_def size0 size1 default_size range
+           in
+             (color, shape, size)
+           end
 
-    | vertex_attr (Ast.Attr [(Ast.Id("shape", _), Ast.LitStr("circle", _))]) =
-    (default_color, Circle, default_size)
-    | vertex_attr (Ast.Attr [(Ast.Id("shape", _), Ast.LitStr("rect", _))]) =
-    (default_color, Rect, default_size)
-
-    | vertex_attr (Ast.Attr [(_, _)]) = raise SemaError
-    | vertex_attr (Ast.Attr ((id, lit)::rest)) =
-    let
-      val (color0, shape0, size0) = vertex_attr (Ast.Attr [(id,lit)])
-      val (color1, shape1, size1) = vertex_attr (Ast.Attr rest)
-      val color = choose_non_def color0 color1 default_color
-      val shape = choose_non_def shape0 shape1 default_shape
-      val size = choose_non_def size0 size1 default_size
-    in
-      (color, shape, size)
-    end
-
-  fun sema_vertex (Ast.Vertex (Ast.Id(s, _), opt_l, opt_a)) (state : State)
+  fun sema_vertex (Ast.Vertex v) (state : State)
     : State * VertexInfo =
     let
+      val (Ast.Id(s, _), opt_l, opt_a) = v
       val vertex_info =
         case (opt_l, opt_a) of
              (NONE, NONE) => (s, vertex_defaults)
@@ -122,7 +127,7 @@ structure Sema = struct
       val new_state : State = (s, vertex_info) :: state
     in
       case find_value_of s state of
-           SOME _ => raise SemaError
+           SOME _ => raise SemaError (Ast.vertex_range (Ast.Vertex v))
          | NONE => (new_state, vertex_info)
     end
 

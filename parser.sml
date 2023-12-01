@@ -1,3 +1,18 @@
+exception InternalError
+
+fun make_range (s : string, start : Token.SourcePos)
+  : Token.SourcePos * Token.SourcePos =
+  let
+    val {line=line_start, col=col_start} = start
+    val finish = {line = line_start, col = col_start + (size s)}
+  in
+    (start, finish)
+  end
+
+fun join_ranges
+  ((first,_) : Token.SourcePos * Token.SourcePos,
+  ((_,last) : Token.SourcePos * Token.SourcePos)) = (first, last)
+
 structure Ast = struct
   (* only the leaves of the AST store source position *)
   datatype Identifier = Id of string * Token.SourcePos
@@ -28,6 +43,30 @@ structure Ast = struct
                     | ErrorAtEOF
 
   exception SyntaxError of ErrorLoc
+
+  fun id_range (Id (s, pos)) : Token.SourcePos * Token.SourcePos =
+    make_range (s, pos)
+
+  fun literal_range (LitStr (s, pos)) : Token.SourcePos * Token.SourcePos =
+    make_range (s, pos)
+    | literal_range (LitNum (n, pos)) = make_range (Int.toString n, pos)
+    | literal_range (LitColor (_, pos)) = make_range ("#AABBCC", pos)
+    | literal_range (LitBool (b, pos)) =
+    make_range ((if b then "true" else "false"), pos)
+
+  fun attr_range (Attr []) = raise InternalError
+    | attr_range (Attr [(id, lit)]) : Token.SourcePos * Token.SourcePos =
+    join_ranges (id_range id, literal_range lit)
+    | attr_range (Attr ((id, lit)::rest)) =
+    join_ranges (id_range id, attr_range (Attr rest))
+
+  fun vertex_range (Vertex (id, NONE, NONE))
+    : Token.SourcePos * Token.SourcePos =
+    id_range id
+    | vertex_range (Vertex (id, SOME label, NONE)) =
+    join_ranges (id_range id, literal_range label)
+    | vertex_range (Vertex (id, _, SOME attr)) =
+    join_ranges (id_range id, attr_range attr)
 end
 
 fun syntax_error_at (t : Token.Token list) : 'a =
