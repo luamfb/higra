@@ -118,4 +118,72 @@ structure Debug = struct
             print ("syntax error at " ^ (dump_error_loc loc) ^ "\n")
       | Token.InvalidToken pos => print (err_msg ("invalid token", pos))
 
+  (*** SEMANTIC VALUES ***)
+
+  fun dump_sema_shape Sema.Circle = "circle"
+    | dump_sema_shape Sema.Rect = "rect"
+
+  fun dump_sema_edge_type Sema.Cont = "(cont_edge '--')"
+    | dump_sema_edge_type Sema.ContDir = "(cont_dir_edge '->')"
+    | dump_sema_edge_type Sema.Dotted = "(dotted_edge '..')"
+    | dump_sema_edge_type Sema.DottedDir = "(dotted_dir_edge '.>')"
+
+  fun dump_sema_color (color : Sema.Color) = "(" ^ (dump_color color) ^ ")"
+
+  fun dump_sema_vertex_attrib ((color, shape, size) : Sema.VertexAttrib) =
+    "(vertex_attrib: color = " ^ (dump_sema_color color)
+    ^ ", shape = " ^ (dump_sema_shape shape)
+    ^ ", size = " ^ (Int.toString size)
+    ^ ")"
+
+  fun dump_sema_edge_attrib (color : Sema.Color) =
+    "(edge_attrib: color = " ^ (dump_sema_color color) ^ ")"
+
+  fun dump_sema_fig_attrib ((font, horiz) : Sema.FigAttrib) =
+    "(fig_attrib: font = " ^ font ^ ", horiz = " ^ (dump_bool horiz) ^ ")"
+
+  fun dump_sema_vertex ((label, attrib) : Sema.VertexInfo) =
+    "(vertex_info: label = " ^ label
+    ^ ", attrib = " ^ (dump_sema_vertex_attrib attrib) ^ ")"
+
+  fun dump_sema_state ([] : Sema.State) = "(empty state)"
+    | dump_sema_state ((id, v_info)::rest) =
+    "(id = " ^ id ^ " => " ^ (dump_sema_vertex v_info)
+    ^ ", " ^ (dump_sema_state rest) ^ ")"
+
+  fun dump_sema_edge ((from, to, edge_type, attr) : Sema.Edge) =
+    "(edge: from = " ^ (dump_sema_vertex from)
+    ^ ", to = " ^ (dump_sema_vertex to)
+    ^ ", type = " ^ (dump_sema_edge_type edge_type)
+    ^ ", attr = " ^ (dump_sema_edge_attrib attr)
+    ^ ")"
+
+  fun dump_edge_list ([] : Sema.Edge list) = ""
+    | dump_edge_list (e::es) =
+    (dump_sema_edge e) ^ ", " ^ (dump_edge_list es)
+
+  fun dump_sema_graph (Sema.Graph (v, edges, subgraphs)) =
+    "(graph: " ^ (dump_sema_vertex v)
+    ^ " edges = (" ^ (dump_edge_list edges)
+    ^ "), subgraphs = (" ^ (dump_graph_list subgraphs) ^ "))"
+  and dump_graph_list [] = ""
+    | dump_graph_list (g::gs) =
+    (dump_sema_graph g) ^ ", " ^ (dump_graph_list gs)
+
+  fun dump_sema_figure ((attr, toplevel) : Sema.Figure) =
+    "(figure: " ^ (dump_sema_fig_attrib attr)
+    ^ ", toplevel = " ^ (dump_sema_graph toplevel)
+
+  fun debug_sema (s: string) =
+    print (dump_sema_figure
+    (Sema.sema_figure (Parser.parse_figure (Lexer.tokenize s))) ^ "\n")
+    handle
+      Sema.SemaError (pos_start, pos_end) =>
+          print (
+          "semantic error from " ^ (dump_pos pos_start)
+          ^ " to " ^ (dump_pos pos_end) ^ "\n")
+      | Ast.SyntaxError loc =>
+          print ("syntax error at " ^ (dump_error_loc loc) ^ "\n")
+      | Token.InvalidToken pos => print (err_msg ("invalid token", pos))
+
 end
