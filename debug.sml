@@ -187,4 +187,18 @@ structure Debug = struct
           print ("syntax error at " ^ (dump_error_loc loc) ^ "\n")
       | Token.InvalidToken pos => print (err_msg ("invalid token", pos))
 
+  (*** BACKEND ***)
+
+  fun debug_backend (s: string) =
+    print (Backend.draw_svg
+      (Sema.sema_figure (Parser.parse_figure (Lexer.tokenize s))))
+    handle
+      Sema.SemaError (pos_start, pos_end) =>
+          print (
+          "semantic error from " ^ (dump_pos pos_start)
+          ^ " to " ^ (dump_pos pos_end) ^ "\n")
+      | Ast.SyntaxError loc =>
+          print ("syntax error at " ^ (dump_error_loc loc) ^ "\n")
+      | Token.InvalidToken pos => print (err_msg ("invalid token", pos))
+
 end
