@@ -142,18 +142,17 @@ structure Debug = struct
   fun dump_sema_fig_attrib ((font, horiz) : Sema.FigAttrib) =
     "(fig_attrib: font = " ^ font ^ ", horiz = " ^ (dump_bool horiz) ^ ")"
 
-  fun dump_sema_vertex ((label, attrib) : Sema.VertexInfo) =
+  fun dump_sema_vertex_info ((label, attrib) : Sema.VertexInfo) =
     "(vertex_info: label = " ^ label
     ^ ", attrib = " ^ (dump_sema_vertex_attrib attrib) ^ ")"
 
   fun dump_sema_state ([] : Sema.State) = "(empty state)"
-    | dump_sema_state ((id, v_info)::rest) =
-    "(id = " ^ id ^ " => " ^ (dump_sema_vertex v_info)
+    | dump_sema_state ((id, info)::rest) =
+    "(id = " ^ id ^ " => " ^ (dump_sema_vertex_info info)
     ^ ", " ^ (dump_sema_state rest) ^ ")"
 
   fun dump_sema_edge ((from, to, edge_type, attr) : Sema.Edge) =
-    "(edge: from = " ^ (dump_sema_vertex from)
-    ^ ", to = " ^ (dump_sema_vertex to)
+    "(edge: from = " ^ from ^ ", to = " ^ to
     ^ ", type = " ^ (dump_sema_edge_type edge_type)
     ^ ", attr = " ^ (dump_sema_edge_attrib attr)
     ^ ")"
@@ -162,17 +161,19 @@ structure Debug = struct
     | dump_edge_list (e::es) =
     (dump_sema_edge e) ^ ", " ^ (dump_edge_list es)
 
-  fun dump_sema_graph (Sema.Graph (v, edges, subgraphs)) =
-    "(graph: " ^ (dump_sema_vertex v)
-    ^ " edges = (" ^ (dump_edge_list edges)
+  fun dump_sema_graph (Sema.Graph (id, edges, subgraphs)) =
+    "(graph: id = " ^ id
+    ^ ", edges = (" ^ (dump_edge_list edges)
     ^ "), subgraphs = (" ^ (dump_graph_list subgraphs) ^ "))"
   and dump_graph_list [] = ""
     | dump_graph_list (g::gs) =
     (dump_sema_graph g) ^ ", " ^ (dump_graph_list gs)
 
-  fun dump_sema_figure ((attr, toplevel) : Sema.Figure) =
+  fun dump_sema_figure ((attr, toplevel, state) : Sema.Figure) =
     "(figure: " ^ (dump_sema_fig_attrib attr)
     ^ ", toplevel = " ^ (dump_sema_graph toplevel)
+    ^ ", state = " ^ (dump_sema_state state)
+    ^ ")"
 
   fun debug_sema (s: string) =
     print (dump_sema_figure

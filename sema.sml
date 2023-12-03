@@ -1,14 +1,14 @@
 fun get_vertex_name (Ast.Vertex ((Ast.Id (s, _)), _, _)) = s
 
-(* traverse a list of (name, value) pairs to find a value whose name
- * matches the given string
+(* traverse a list of (name, value) pairs to find if some value has the
+ * same name as the given string s
  *)
-fun find_value_of (s : string) ([] : (string * 'a) list) : 'a option = NONE
-  | find_value_of (s : string) ((name, value)::rest) =
-      if name = s then
-        SOME value
-      else
-        find_value_of s rest
+fun contains_id (s : string) ([] : (string * 'a) list) : bool = false
+  | contains_id (s : string) ((name, _)::rest) =
+  if name = s then
+    true
+  else
+    contains_id s rest
 
 structure Sema = struct
   exception SemaError of Token.SourcePos * Token.SourcePos
@@ -24,13 +24,14 @@ structure Sema = struct
   type EdgeAttrib = Color
   type FigAttrib = string * bool
 
+  type VertexId = string
   type VertexInfo = string * VertexAttrib
-  type State = (string * VertexInfo) list
-  type Edge = VertexInfo * VertexInfo * EdgeType * EdgeAttrib
+  type State = (VertexId * VertexInfo) list
+  type Edge = VertexId * VertexId * EdgeType * EdgeAttrib
 
-  datatype Graph = Graph of VertexInfo * (Edge list) * (Graph list)
+  datatype Graph = Graph of VertexId * (Edge list) * (Graph list)
 
-  type Figure = FigAttrib * Graph
+  type Figure = FigAttrib * Graph * State
 
   val default_color = (0, 0, 0)
   val default_shape = Circle
@@ -113,8 +114,7 @@ structure Sema = struct
              (color, shape, size)
            end
 
-  fun sema_vertex (Ast.Vertex v) (state : State)
-    : State * VertexInfo =
+  fun sema_vertex (Ast.Vertex v) (state : State) : State * VertexId =
     let
       val (Ast.Id(s, _), opt_l, opt_a) = v
       val vertex_info =
@@ -124,18 +124,23 @@ structure Sema = struct
            | (NONE, SOME attr) => (s, vertex_attr attr)
            | (SOME label, SOME attr) => (lit_str label, vertex_attr attr)
 
-      val new_state : State = (s, vertex_info) :: state
+      val new_state = (s, vertex_info) :: state
     in
-      case find_value_of s state of
-           SOME _ => raise SemaError (Ast.vertex_range (Ast.Vertex v))
-         | NONE => (new_state, vertex_info)
+      if contains_id s state then
+        raise SemaError (Ast.vertex_range (Ast.Vertex v))
+      else
+        (new_state, s)
     end
 
-  fun get_or_make_vertex (v : Ast.Vertex) (state : State)
-    : State * VertexInfo =
-    case find_value_of (get_vertex_name v) state of
-         NONE => sema_vertex v state
-       | SOME x => (state, x)
+  fun get_or_make_vertex (v : Ast.Vertex) (state : State) : State * VertexId =
+  let
+    val id = get_vertex_name v
+  in
+    if contains_id id state then
+      (state, id)
+    else
+      sema_vertex v state
+  end
 
   fun sema_edge (Ast.Edge (from, to, edge_type, opt_attr)) (state0 : State)
     : State * Edge =
@@ -185,10 +190,10 @@ structure Sema = struct
     val attr : FigAttrib = case opt_attr of
                                 NONE => fig_defaults
                               | SOME a => fig_attr a
-    val (_, figure : Graph) =
+    val (last_state, figure : Graph) =
       sema_graph (Ast.Graph (toplevel, elem_list)) empty_state
   in
-    (attr, figure)
+    (attr, figure, last_state)
   end
 
 end
