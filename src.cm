@@ -5,6 +5,7 @@ Library
     structure Parser
     structure Sema
     structure Backend
+    structure Geom
     structure Debug
     structure Main
 is
@@ -16,3 +17,4 @@ is
     parser.sml
     sema.sml
     backend.sml
+    geom.sml

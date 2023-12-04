@@ -21,25 +21,13 @@ structure Backend = struct
   (* separation between vertices *)
   val vertex_sep = 25
 
-  (* top-left x, top-left y, width, height *)
-  type Box = int * int * int * int
-
   (* mapping of vertices drawing on screen and their bounding boxes *)
-  type Drawing = (Sema.VertexId * Box) list
+  type Drawing = (Sema.VertexId * Geom.Box) list
 
-  fun drawing_max_dim ([] : Drawing) : int * int = (0, 0)
-    | drawing_max_dim ((_, (x, y, width, height))::rest) =
-    let
-      val cur_x = x + width
-      val cur_y = y + height
-      val (rest_x, rest_y) = drawing_max_dim rest
-      val max_x = if cur_x > rest_x then cur_x else rest_x
-      val max_y = if cur_y > rest_y then cur_y else rest_y
-    in
-      (max_x, max_y)
-    end
+  fun box_list_from ([] : Drawing) : Geom.Box list = []
+    | box_list_from ((_, box):: rest) = box::(box_list_from rest)
 
-  fun get_vertex_box (id : Sema.VertexId) ([] : Drawing) : Box option =
+  fun get_vertex_box (id : Sema.VertexId) ([] : Drawing) : Geom.Box option =
     NONE
     | get_vertex_box id ((cur_id, box)::rest) =
     if id = cur_id then
@@ -52,17 +40,27 @@ structure Backend = struct
   fun place_free_vertex (id : Sema.VertexId) (drawing : Drawing)
     ((width, height) : int * int) : Drawing * (int * int) =
     let
-      (* TODO actually take horizontal into account *)
-      val (max_x, _) = drawing_max_dim drawing
-      val x = if max_x > 0 then max_x + vertex_sep else 0
-      val y = 0
-      val box : Box = (x, y, width, height)
+      val (x, y) = Geom.next_free_topleft vertex_sep (box_list_from drawing)
+      val box : Geom.Box = (x, y, width, height)
       val new_drawing : Drawing = (id, box)::drawing
     in
       (new_drawing, (x, y))
     end
 
-  fun draw_vertex (id : Sema.VertexId) (state : Sema.State) (drawing : Drawing)
+  (* TODO take vertex attributes into account *)
+  fun gen_vertex_svg (id : Sema.VertexId) ((v_x, v_y) : int * int)
+    ((vertex_rx, vertex_ry) : int * int) (label : string) =
+    "<g id=\"" ^ id ^ "\" class=\"vertex\">\n"
+    ^ "<ellipse fill=\"none\" stroke=\"black\" cx=\"" ^ (Int.toString v_x)
+    ^ "\" cy=\"" ^ (Int.toString v_y)
+    ^ "\" rx=\"" ^ (Int.toString vertex_rx)
+    ^ "\" ry=\"" ^ (Int.toString vertex_ry)
+    ^ "\" />\n<text text-anchor=\"middle\" x=\"" ^ (Int.toString v_x)
+    ^ "\" y =\"" ^ (Int.toString v_y)
+    ^ "\" font-family=\"Times\" font-size=\"14\">" ^ label ^ "</text>\n"
+    ^ "</g>"
+
+  fun draw_free_vertex (id : Sema.VertexId) (state : Sema.State) (drawing : Drawing)
     : Drawing * string =
   let
     (* TODO take vertex attributes into account *)
@@ -78,22 +76,11 @@ structure Backend = struct
     val (new_drawing, (v_topleft_x, v_topleft_y)) =
       place_free_vertex id drawing (width, height)
 
-    (* TODO take shape into account *)
     val v_x = v_topleft_x + (width div 2)
     val v_y = v_topleft_y + (height div 2)
 
-    val vertex_svg =
-      "<g id=\"" ^ id ^ "\" class=\"vertex\">\n"
-      ^ "<ellipse fill=\"none\" stroke=\"black\" cx=\"" ^ (Int.toString v_x)
-      ^ "\" cy=\"" ^ (Int.toString v_y)
-      ^ "\" rx=\"" ^ (Int.toString vertex_rx)
-      ^ "\" ry=\"" ^ (Int.toString vertex_ry)
-      ^ "\" />\n<text text-anchor=\"middle\" x=\"" ^ (Int.toString v_x)
-      ^ "\" y =\"" ^ (Int.toString v_y)
-      ^ "\" font-family=\"Times\" font-size=\"14\">" ^ label ^ "</text>\n"
-      ^ "</g>"
   in
-    (new_drawing, vertex_svg)
+    (new_drawing, gen_vertex_svg id (v_x, v_y) (vertex_rx, vertex_ry) label)
   end
 
   fun draw_edge ((v_from, v_to, e_type, attr) : Sema.Edge)
@@ -105,16 +92,16 @@ structure Backend = struct
         case (opt_from_box, opt_to_box) of
              (NONE, NONE) =>
              let
-               val (drawing1, svg1) = draw_vertex v_from state drawing0
-               val (drawing2, svg2) = draw_vertex v_to state drawing1
+               val (drawing1, svg1) = draw_free_vertex v_from state drawing0
+               val (drawing2, svg2) = draw_free_vertex v_to state drawing1
              in
                (drawing2, svg1 ^ "\n" ^ svg2)
              end
            (* TODO When positioning a vertex that has an edge to
             * another one that's already been positioned,
             * make it as close as possible to the original one *)
-           | (SOME from_box, NONE) => draw_vertex v_to state drawing0
-           | (NONE, SOME to_box) => draw_vertex v_from state drawing0
+           | (SOME from_box, NONE) => draw_free_vertex v_to state drawing0
+           | (NONE, SOME to_box) => draw_free_vertex v_from state drawing0
            | _ => (drawing0, "")
     in
       (* FIXME draw actual edge too, not just vertices
