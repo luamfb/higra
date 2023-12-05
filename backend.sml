@@ -38,10 +38,22 @@ structure Backend = struct
   (* always tries to walk towards the primary dimension:
    * left if horizontal is true, down otherwise *)
   fun place_free_vertex (id : Sema.VertexId) (drawing : Drawing)
-    ((width, height) : int * int) : Drawing * (int * int) =
+    ((width, height) : int * int) : Drawing * Geom.Point =
     let
       val (x, y) = Geom.next_free_topleft vertex_sep (box_list_from drawing)
       val box : Geom.Box = (x, y, width, height)
+      val new_drawing : Drawing = (id, box)::drawing
+    in
+      (new_drawing, (x, y))
+    end
+
+  fun place_vertex_near_to (id : Sema.VertexId) (drawing : Drawing)
+    (near : Geom.Box) ((width, height) : int * int) : Drawing * Geom.Point =
+    let
+      val box_list = box_list_from drawing
+      val box =
+        Geom.free_box_near_to vertex_sep near (width, height) box_list
+      val (x, y, _, _) = box
       val new_drawing : Drawing = (id, box)::drawing
     in
       (new_drawing, (x, y))
@@ -60,8 +72,8 @@ structure Backend = struct
     ^ "\" font-family=\"Times\" font-size=\"14\">" ^ label ^ "</text>\n"
     ^ "</g>"
 
-  fun draw_free_vertex (id : Sema.VertexId) (state : Sema.State) (drawing : Drawing)
-    : Drawing * string =
+  fun draw_vertex (id : Sema.VertexId) (state : Sema.State) (drawing : Drawing)
+    (opt_near : Geom.Box option) : Drawing * Geom.Box * string =
   let
     (* TODO take vertex attributes into account *)
     val (label, v_attr) = get_vertex_info id state
@@ -74,40 +86,65 @@ structure Backend = struct
     val height = 2 * vertex_ry
 
     val (new_drawing, (v_topleft_x, v_topleft_y)) =
-      place_free_vertex id drawing (width, height)
+      case opt_near of
+           NONE => place_free_vertex id drawing (width, height)
+         | SOME near => place_vertex_near_to id drawing near (width, height)
 
     val v_x = v_topleft_x + (width div 2)
     val v_y = v_topleft_y + (height div 2)
 
+    val svg = gen_vertex_svg id (v_x, v_y) (vertex_rx, vertex_ry) label
+    val box = (v_topleft_x, v_topleft_y, width, height)
   in
-    (new_drawing, gen_vertex_svg id (v_x, v_y) (vertex_rx, vertex_ry) label)
+    (new_drawing, box, svg)
   end
+
+  fun draw_free_vertex (id : Sema.VertexId) (state : Sema.State)
+    (drawing : Drawing) : Drawing * Geom.Box * string =
+    draw_vertex id state drawing NONE
+
+  fun draw_vertex_near_to (id : Sema.VertexId) (near : Geom.Box)
+    (state : Sema.State) (drawing : Drawing)
+    : Drawing * Geom.Box * string =
+    draw_vertex id state drawing (SOME near)
+
+  fun draw_vertices_if_needed ((v_from, v_to) : Sema.VertexId * Sema.VertexId)
+    (state : Sema.State) (drawing0 : Drawing)
+    : Drawing * Geom.Box * Geom.Box * string =
+    case (get_vertex_box v_from drawing0, get_vertex_box v_to drawing0) of
+         (NONE, NONE) =>
+         let
+           val (drawing1, from_box, svg1) =
+             draw_free_vertex v_from state drawing0
+           val (drawing2, to_box, svg2) =
+             draw_vertex_near_to v_to from_box state drawing1
+           in
+             (drawing2, from_box, to_box, svg1 ^ "\n" ^ svg2)
+           end
+       | (SOME from_box, NONE) =>
+           let
+             val (drawing1, to_box, svg1) =
+               draw_vertex_near_to v_to from_box state drawing0
+           in
+             (drawing1, from_box, to_box, svg1)
+           end
+       | (NONE, SOME to_box) =>
+           let
+             val (drawing1, from_box, svg1) =
+               draw_vertex_near_to v_from to_box state drawing0
+           in
+             (drawing1, from_box, to_box, svg1)
+           end
+       | (SOME from_box, SOME to_box) =>
+           (drawing0, from_box, to_box, "")
 
   fun draw_edge ((v_from, v_to, e_type, attr) : Sema.Edge)
     (state : Sema.State) (drawing0 : Drawing) : Drawing * string =
     let
-      val opt_from_box = get_vertex_box v_from drawing0
-      val opt_to_box = get_vertex_box v_to drawing0
-      val (drawing, svg) =
-        case (opt_from_box, opt_to_box) of
-             (NONE, NONE) =>
-             let
-               val (drawing1, svg1) = draw_free_vertex v_from state drawing0
-               val (drawing2, svg2) = draw_free_vertex v_to state drawing1
-             in
-               (drawing2, svg1 ^ "\n" ^ svg2)
-             end
-           (* TODO When positioning a vertex that has an edge to
-            * another one that's already been positioned,
-            * make it as close as possible to the original one *)
-           | (SOME from_box, NONE) => draw_free_vertex v_to state drawing0
-           | (NONE, SOME to_box) => draw_free_vertex v_from state drawing0
-           | _ => (drawing0, "")
+      val (drawing, from_box, to_box, svg) =
+        draw_vertices_if_needed (v_from, v_to) state drawing0
     in
-      (* FIXME draw actual edge too, not just vertices
-       *    for that, we'll probably need the bounding boxes too;
-       *    make draw_vertex return that
-       *)
+      (* FIXME draw actual edge too, not just vertices *)
       (drawing, svg)
     end
 
