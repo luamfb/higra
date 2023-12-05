@@ -21,6 +21,9 @@ structure Backend = struct
   (* separation between vertices *)
   val vertex_sep = 25
 
+  (* offset by which to displace an edge if there are vertices in the way *)
+  val edge_displ = vertex_sep div 2
+
   (* mapping of vertices drawing on screen and their bounding boxes *)
   type Drawing = (Sema.VertexId * Geom.Box) list
 
@@ -75,7 +78,6 @@ structure Backend = struct
   fun draw_vertex (id : Sema.VertexId) (state : Sema.State) (drawing : Drawing)
     (opt_near : Geom.Box option) : Drawing * Geom.Box * string =
   let
-    (* TODO take vertex attributes into account *)
     val (label, v_attr) = get_vertex_info id state
 
     (* TODO compute dynamically depending on text length *)
@@ -138,14 +140,29 @@ structure Backend = struct
        | (SOME from_box, SOME to_box) =>
            (drawing0, from_box, to_box, "")
 
-  fun draw_edge ((v_from, v_to, e_type, attr) : Sema.Edge)
+  fun gen_edge_svg ((v_from, v_to, e_type, attr) : Sema.Edge)
+    (from_box : Geom.Box) (to_box : Geom.Box) =
+    let
+      val ((x1, y1), (x2, y2)) =
+        Geom.box_connector_line from_box to_box edge_displ
+    in
+      (* TODO take edge color / type into account *)
+      "<g class=\"edge\">\n<line x1=\"" ^ (Int.toString x1)
+      ^ "\" y1 = \"" ^ (Int.toString y1)
+      ^ "\" x2 = \"" ^ (Int.toString x2)
+      ^ "\" y2 = \"" ^ (Int.toString y2)
+      ^ "\" stroke = \"black\"/>\n</g>"
+    end
+
+  fun draw_edge (edge : Sema.Edge)
     (state : Sema.State) (drawing0 : Drawing) : Drawing * string =
     let
-      val (drawing, from_box, to_box, svg) =
+      val (v_from, v_to, e_type, attr) = edge
+      val (drawing, from_box, to_box, vertex_svg) =
         draw_vertices_if_needed (v_from, v_to) state drawing0
+      val edge_svg = gen_edge_svg edge from_box to_box
     in
-      (* FIXME draw actual edge too, not just vertices *)
-      (drawing, svg)
+      (drawing, vertex_svg ^ "\n" ^ edge_svg)
     end
 
   fun draw_edge_list [] (state : Sema.State) (drawing : Drawing)

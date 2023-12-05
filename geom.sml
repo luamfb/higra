@@ -1,9 +1,16 @@
+exception InternalError
+
 structure Geom = struct
   (* top-left x, top-left y, width, height *)
   type Point = int * int
 
   (* top-left x, top-left y, width, height *)
   type Box = int * int * int * int
+
+  datatype Line = Vertical of int (* x coord *)
+                     | Horizontal of int (* y coord *)
+                     (* slope, inverse slope, offset *)
+                     | Oblique of int * int * int
 
   fun box_list_max_dim ([] : Box list) : int * int = (0, 0)
     | box_list_max_dim ((x, y, width, height)::rest) =
@@ -56,6 +63,14 @@ structure Geom = struct
       orelse top1 > bottom2)
   end
 
+  fun box_center ((x, y, width, height) : Box) : Point =
+  let
+    val x_center = x + (height div 2)
+    val y_center = y + (width div 2)
+  in
+    (x_center, y_center)
+  end
+
   fun box_is_free (box : Box) ([] : Box list) = true
     | box_is_free (box : Box) (cur::rest) =
     if (box_intersects box cur) then
@@ -85,5 +100,83 @@ structure Geom = struct
             (next_x, next_y, width, height)
           end
     end
+
+  (* get (left, top, right, bottom) coordinates of a box *)
+  fun box_coords ((left, top, width, height) : Box)
+    : int * int * int * int =
+    (left, top, left + width, top + height)
+
+  fun line_between ((x1, y1) : Point) ((x2, y2) : Point) : Line =
+    if (x1 = x2) then
+      Vertical x1
+    else if (y1 = y2)  then
+      Horizontal y2
+    else
+      let
+        (* the line is given by y = slope * x + offset,
+         * or equivalently x = inv_slope * y - offset.
+         * Here x_1 - x_2 != 0 and y_1 - y_2 != 0,
+         * so neither slope nor inv_slope trigger division by zero *)
+        val slope = (y1 - y2) div (x1 - x2)
+        val inv_slope = (x1 - x2) div (y1 - y2)
+        val offset = y1 - slope * x1
+      in
+        Oblique (slope, inv_slope, offset)
+      end
+
+  (* gives the intersection point between the given line and
+   * the box's edge that is closest to a given point P.
+   *)
+  fun line_box_intersection (box : Box) (line : Line) ((x_p,y_p) : Point)
+    : Point =
+    let
+      val (left, top, right, bot) = box_coords box
+      val (x_c, y_c) = box_center box
+    in
+      case line of
+           Vertical x => (x, (if y_p < top then top else bot))
+         | Horizontal y => ((if x_p < left then left else right), y)
+         | Oblique (slope, inv_slope, offset) =>
+             let
+               val line_x_at = fn y => inv_slope * (y - offset)
+               val line_y_at = fn x => slope * x + offset
+               val x_within_box = fn x => x <= right andalso x >= left
+               val y_within_box = fn y => y <= bot andalso y >= top
+
+               val line_x_at_bot = line_x_at bot
+               val line_x_at_top = line_x_at top
+               val line_y_at_left = line_y_at left
+               val line_y_at_right = line_y_at right
+             in
+               if x_p < x_c andalso y_within_box line_y_at_left then
+                 (left, line_y_at_left)
+               else if x_p > x_c andalso y_within_box line_y_at_right then
+                 (right, line_y_at_right)
+               else if y_p < y_c andalso x_within_box line_x_at_top then
+                 (line_x_at_top, top)
+               else if y_p > y_c andalso x_within_box line_x_at_bot then
+                 (line_x_at_bot, bot)
+               else
+                 raise InternalError
+        end
+    end
+
+  (* gets the coordinates of a line connecting the boxes *)
+  fun box_connector_line (box1 : Box) (box2 : Box) (edge_displ : int)
+    : Point * Point =
+  let
+    val (left1, top1, right1, bot1) = box_coords box1
+    val (left2, top2, right2, bot2) = box_coords box2
+    val center1 = box_center box1
+    val center2 = box_center box2
+    val (x_center1, y_center1) = center1
+    val (x_center2, y_center2) = center2
+    val line = line_between center1 center2
+  in
+      (* TODO take vertex shape into account *)
+      (* FIXME should check if there's a vertex in the way *)
+      (line_box_intersection box1 line center2,
+      line_box_intersection box2 line center1)
+  end
 
 end
