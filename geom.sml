@@ -9,8 +9,8 @@ structure Geom = struct
 
   datatype Line = Vertical of int (* x coord *)
                      | Horizontal of int (* y coord *)
-                     (* slope, inverse slope, offset *)
-                     | Oblique of int * int * int
+                     (* slope, inv_slope, offset *)
+                     | Oblique of real * real * real
 
   fun box_list_max_dim ([] : Box list) : int * int = (0, 0)
     | box_list_max_dim ((x, y, width, height)::rest) =
@@ -118,9 +118,11 @@ structure Geom = struct
          * or equivalently x = inv_slope * y - offset.
          * Here x_1 - x_2 != 0 and y_1 - y_2 != 0,
          * so neither slope nor inv_slope trigger division by zero *)
-        val slope = (y1 - y2) div (x1 - x2)
-        val inv_slope = (x1 - x2) div (y1 - y2)
-        val offset = y1 - slope * x1
+        val delta_y = Real.fromInt (y1 - y2)
+        val delta_x = Real.fromInt (x1 - x2)
+        val slope = delta_y / delta_x
+        val inv_slope = delta_x / delta_y
+        val offset = (Real.fromInt y1) - slope * (Real.fromInt x1)
       in
         Oblique (slope, inv_slope, offset)
       end
@@ -129,7 +131,8 @@ structure Geom = struct
     case line of
          Vertical x => x = x_p
        | Horizontal y => y = y_p
-       | Oblique (slope, _, offset) => y_p = slope * x_p + offset
+       | Oblique (slope, _, offset) =>
+           y_p = round (slope * Real.fromInt(x_p) + offset)
 
   fun points_are_colinear (p1 : Point) (p2 : Point) (p3 : Point) : bool =
     point_in_line p3 (line_between p1 p2)
@@ -160,8 +163,10 @@ structure Geom = struct
          | Horizontal y => ((if x_p < left then left else right), y)
          | Oblique (slope, inv_slope, offset) =>
              let
-               val line_x_at = fn y => inv_slope * (y - offset)
-               val line_y_at = fn x => slope * x + offset
+               val line_x_at =
+                 fn y => round (inv_slope * ((Real.fromInt y) - offset))
+               val line_y_at =
+                 fn x => round (slope * (Real.fromInt x) + offset)
                val x_within_box = fn x => x <= right andalso x >= left
                val y_within_box = fn y => y <= bot andalso y >= top
 
@@ -244,4 +249,25 @@ structure Geom = struct
           ((x0, y0), (x1, y1), (x2, y2), (x3, y3))
         end
     end
+
+  (* computes the arrowhead points of the edge going from one point
+   * to another. *)
+  fun arrowhead_points ((x_from, y_from) : Point) ((x_to, y_to) : Point)
+    (size : int) : Point * Point =
+    case (line_between (x_from, y_from) (x_to, y_to)) of
+         Horizontal _ =>
+           let
+             val x = if x_from < x_to then x_to - size else x_to + size
+           in
+             ((x, y_to - size), (x, y_to + size))
+           end
+       | Vertical _ =>
+           let
+             val y = if y_from < y_to then y_to - size else y_to + size
+           in
+             ((x_to - size, y), (x_to + size, y))
+           end
+       | Oblique (slope, inv_slope, offset) =>
+           (* TODO *)
+           raise InternalError (*XXX*)
 end

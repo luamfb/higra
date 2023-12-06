@@ -15,6 +15,9 @@ fun get_vertex_info (id : Sema.VertexId) ([] : Sema.State) : Sema.VertexInfo =
   else
     get_vertex_info id rest
 
+fun is_edge_directed (e_type : Sema.EdgeType) : bool =
+  (e_type = Sema.ContDir) orelse (e_type = Sema.DottedDir)
+
 structure Backend = struct
   (* All dimensions are measured in pixels. *)
 
@@ -23,6 +26,9 @@ structure Backend = struct
 
   (* offset by which to displace an edge if there are vertices in the way *)
   val edge_displ = vertex_sep div 2
+
+  (* size of a directed edge's arrow head *)
+  val arrow_size = 5
 
   (* mapping of vertices drawing on screen and their bounding boxes *)
   type Drawing = (Sema.VertexId * Geom.Box) list
@@ -140,25 +146,46 @@ structure Backend = struct
        | (SOME from_box, SOME to_box) =>
            (drawing0, from_box, to_box, "")
 
-  fun gen_edge_svg ((v_from, v_to, e_type, attr) : Sema.Edge)
+  (* TODO take color into account *)
+  fun gen_arrowhead_svg ((_, _, e_type, attr) : Sema.Edge)
+    (from : Geom.Point) (to : Geom.Point) : string =
+    if not (is_edge_directed e_type) then
+      ""
+    else
+      let
+        val (x0, y0) = to
+        val ((x1, y1), (x2, y2)) = Geom.arrowhead_points from to arrow_size
+      in
+        "<path d=\"M" ^ (Int.toString x0) ^ "," ^ (Int.toString y0)
+        ^ " L" ^ (Int.toString x1) ^ "," ^ (Int.toString y1)
+        ^ " L" ^ (Int.toString x2) ^ "," ^ (Int.toString y2)
+        ^ " Z\" stroke=\"black\"/>"
+      end
+
+  fun gen_edge_svg (edge : Sema.Edge)
     ((x1, y1) : Geom.Point) ((x2, y2) : Geom.Point) =
     let
+      val (_, _, e_type, attr) = edge
+      val arrowhead_svg = gen_arrowhead_svg edge (x1, y1) (x2, y2)
     in
       (* TODO take edge color / type into account *)
       "<g class=\"edge\">\n<line x1=\"" ^ (Int.toString x1)
       ^ "\" y1 = \"" ^ (Int.toString y1)
       ^ "\" x2 = \"" ^ (Int.toString x2)
       ^ "\" y2 = \"" ^ (Int.toString y2)
-      ^ "\" stroke = \"black\"/>\n</g>"
+      ^ "\" stroke = \"black\"/>\n"
+      ^ arrowhead_svg ^ "\n</g>"
     end
 
   (* an indirect edge takes a "detour" because another vertex is in
    * the way of a direct edge joining the vertices' centers *)
-  fun gen_indirect_edge_svg ((_, _, e_type, attr) : Sema.Edge)
+  fun gen_indirect_edge_svg (edge : Sema.Edge)
     (from_box : Geom.Box) (to_box : Geom.Box) =
     let
+      val (_, _, e_type, attr) = edge
       val ((x0, y0), (x1, y1), (x2, y2), (x3, y3)) =
         Geom.compute_indirect_path from_box to_box edge_displ
+      val arrowhead_svg = gen_arrowhead_svg edge (x2, y2) (x3, y3)
     in
       (* TODO take edge color / type into account *)
       "<g class=\"indirect_edge\">\n<path d=\"M"
@@ -166,7 +193,8 @@ structure Backend = struct
       ^ " L" ^ (Int.toString x1) ^ "," ^ (Int.toString y1)
       ^ " L" ^ (Int.toString x2) ^ "," ^ (Int.toString y2)
       ^ " L" ^ (Int.toString x3) ^ "," ^ (Int.toString y3)
-      ^ "\" fill=\"none\" stroke=\"black\"/>\n</g>"
+      ^ "\" fill=\"none\" stroke=\"black\"/>\n"
+      ^ arrowhead_svg ^ "\n</g>"
     end
 
   fun draw_edge (edge : Sema.Edge)
