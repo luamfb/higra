@@ -152,6 +152,23 @@ structure Backend = struct
       ^ "\" stroke = \"black\"/>\n</g>"
     end
 
+  (* an indirect edge takes a "detour" because another vertex is in
+   * the way of a direct edge joining the vertices' centers *)
+  fun gen_indirect_edge_svg ((_, _, e_type, attr) : Sema.Edge)
+    (from_box : Geom.Box) (to_box : Geom.Box) =
+    let
+      val ((x0, y0), (x1, y1), (x2, y2), (x3, y3)) =
+        Geom.compute_indirect_path from_box to_box edge_displ
+    in
+      (* TODO take edge color / type into account *)
+      "<g class=\"indirect_edge\">\n<path d=\"M"
+      ^ (Int.toString x0) ^ "," ^ (Int.toString y0)
+      ^ " L" ^ (Int.toString x1) ^ "," ^ (Int.toString y1)
+      ^ " L" ^ (Int.toString x2) ^ "," ^ (Int.toString y2)
+      ^ " L" ^ (Int.toString x3) ^ "," ^ (Int.toString y3)
+      ^ "\" fill=\"none\" stroke=\"black\"/>\n</g>"
+    end
+
   fun draw_edge (edge : Sema.Edge)
     (state : Sema.State) (drawing0 : Drawing) : Drawing * string =
     let
@@ -164,8 +181,7 @@ structure Backend = struct
         if Geom.line_segment_is_free p1 p2 box_list then
           gen_edge_svg edge p1 p2
         else
-          (* TODO generate indirect edge *)
-          raise InternalError (*XXX*)
+          gen_indirect_edge_svg edge from_box to_box
     in
       (drawing1, vertex_svg ^ "\n" ^ edge_svg)
     end

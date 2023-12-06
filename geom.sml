@@ -213,4 +213,35 @@ structure Geom = struct
       (p1, p2)
   end
 
+  fun compute_indirect_path (from_box : Box) (to_box : Box) (displ : int)
+    : Point * Point * Point * Point =
+    let
+      val (_, _, right_from, bot_from) = box_coords from_box
+      val (_, _, right_to, bot_to) = box_coords to_box
+      val (x_center_from, y_center_from) = box_center from_box
+      val (x_center_to, y_center_to) = box_center to_box
+    in
+      if x_center_from = x_center_to then
+        (* vertical line: go right first *)
+        let
+          val (x0, y0) = (right_from, y_center_from)
+          val (x3, y3) = (right_to, y_center_to)
+
+          val (x1, y1) = (x0 + displ, y0)
+          val (x2, y2) = (x3 + displ, y3)
+        in
+          ((x0, y0), (x1, y1), (x2, y2), (x3, y3))
+        end
+      else
+        (* non-vertical line: go down first *)
+        let
+          val (x0, y0) = (x_center_from, bot_from)
+          val (x3, y3) = (x_center_to, bot_to)
+
+          val (x1, y1) = (x0, y0 + displ)
+          val (x2, y2) = (x3, y3 + displ)
+        in
+          ((x0, y0), (x1, y1), (x2, y2), (x3, y3))
+        end
+    end
 end
