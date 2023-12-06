@@ -141,10 +141,8 @@ structure Backend = struct
            (drawing0, from_box, to_box, "")
 
   fun gen_edge_svg ((v_from, v_to, e_type, attr) : Sema.Edge)
-    (from_box : Geom.Box) (to_box : Geom.Box) =
+    ((x1, y1) : Geom.Point) ((x2, y2) : Geom.Point) =
     let
-      val ((x1, y1), (x2, y2)) =
-        Geom.box_connector_line from_box to_box edge_displ
     in
       (* TODO take edge color / type into account *)
       "<g class=\"edge\">\n<line x1=\"" ^ (Int.toString x1)
@@ -158,11 +156,18 @@ structure Backend = struct
     (state : Sema.State) (drawing0 : Drawing) : Drawing * string =
     let
       val (v_from, v_to, e_type, attr) = edge
-      val (drawing, from_box, to_box, vertex_svg) =
+      val (drawing1, from_box, to_box, vertex_svg) =
         draw_vertices_if_needed (v_from, v_to) state drawing0
-      val edge_svg = gen_edge_svg edge from_box to_box
+      val (p1, p2) = Geom.box_connector_line from_box to_box
+      val box_list = box_list_from drawing1
+      val edge_svg =
+        if Geom.line_segment_is_free p1 p2 box_list then
+          gen_edge_svg edge p1 p2
+        else
+          (* TODO generate indirect edge *)
+          raise InternalError (*XXX*)
     in
-      (drawing, vertex_svg ^ "\n" ^ edge_svg)
+      (drawing1, vertex_svg ^ "\n" ^ edge_svg)
     end
 
   fun draw_edge_list [] (state : Sema.State) (drawing : Drawing)

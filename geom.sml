@@ -52,7 +52,8 @@ structure Geom = struct
     (next_x, next_y)
   end
 
-  fun box_intersects ((left1,top1,w1,h1) : Box) ((left2,top2,w2,h2) : Box) : bool =
+  fun box_intersects ((left1,top1,w1,h1) : Box) ((left2,top2,w2,h2) : Box)
+    : bool =
   let
     val (right1, bottom1) = (left1 + w1, top1 + h1)
     val (right2, bottom2) = (left2 + w2, top2 + h2)
@@ -124,6 +125,27 @@ structure Geom = struct
         Oblique (slope, inv_slope, offset)
       end
 
+  fun point_in_line ((x_p, y_p) : Point) (line : Line) : bool =
+    case line of
+         Vertical x => x = x_p
+       | Horizontal y => y = y_p
+       | Oblique (slope, _, offset) => y_p = slope * x_p + offset
+
+  fun points_are_colinear (p1 : Point) (p2 : Point) (p3 : Point) : bool =
+    point_in_line p3 (line_between p1 p2)
+
+  (* check that point p is between p1 and p2 *)
+  fun point_is_between (p : Point) (p1 : Point) (p2 : Point)  : bool =
+    let
+      val (x, y) = p
+      val (x1, y1) = p1
+      val (x2, y2) = p2
+      val (x_min, x_max) = if x1 < x2 then (x1, x2) else (x2, x1)
+      val (y_min, y_max) = if y1 < y2 then (y1, y2) else (y2, y1)
+    in
+      x >= x_min andalso x <= x_max andalso y >= y_min andalso y <= y_max
+    end
+
   (* gives the intersection point between the given line and
    * the box's edge that is closest to a given point P.
    *)
@@ -161,22 +183,34 @@ structure Geom = struct
         end
     end
 
+  fun line_segment_is_free (p1 : Point) (p2 : Point) ([] : Box list) = true
+    | line_segment_is_free p1 p2 (box::rest) =
+    let
+      val center = box_center box
+      val is_between = (point_is_between center p1 p2)
+    in
+      if is_between andalso (points_are_colinear center p1 p2) then
+          false
+      else
+        line_segment_is_free p1 p2 rest
+    end
+
   (* gets the coordinates of a line connecting the boxes *)
-  fun box_connector_line (box1 : Box) (box2 : Box) (edge_displ : int)
-    : Point * Point =
+  fun box_connector_line (box1 : Box) (box2 : Box) : Point * Point =
   let
+    (*
     val (left1, top1, right1, bot1) = box_coords box1
     val (left2, top2, right2, bot2) = box_coords box2
+    *)
     val center1 = box_center box1
     val center2 = box_center box2
-    val (x_center1, y_center1) = center1
-    val (x_center2, y_center2) = center2
     val line = line_between center1 center2
+
+    (* TODO take vertex shape into account *)
+    val p1 = line_box_intersection box1 line center2
+    val p2 = line_box_intersection box2 line center1
   in
-      (* TODO take vertex shape into account *)
-      (* FIXME should check if there's a vertex in the way *)
-      (line_box_intersection box1 line center2,
-      line_box_intersection box2 line center1)
+      (p1, p2)
   end
 
 end
