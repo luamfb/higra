@@ -124,7 +124,7 @@ structure Backend = struct
     val (font, horiz) = fig_attr
     val (label, v_attr) = get_vertex_info id state
 
-    (* TODO compute dynamically depending on text length *)
+    (* FIXME should be computed dynamically depending on text and font *)
     val width = 60
     val height = 60
 
@@ -277,9 +277,13 @@ structure Backend = struct
       val (max_x, max_y) = Geom.box_list_max_dim (box_list_from drawing)
       val fig_w = max_x + vertex_sep
       val fig_h = max_y + vertex_sep
+      val svg_width = 500
+      val svg_height = 500
       val svg_header =
-        "<svg width=\"" ^ (Int.toString fig_w)
-        ^ "\" height=\"" ^ (Int.toString fig_h)
+        "<svg width=\"" ^ (Int.toString svg_width)
+        ^ "\" height=\"" ^ (Int.toString svg_height)
+        ^ "\" viewBox=\"0 0 " ^ (Int.toString fig_w)
+        ^ " " ^ (Int.toString fig_h)
         ^ "\" xmlns=\"http://www.w3.org/2000/svg\">\n"
     in
       (* TODO also recurse for each subgraph *)
