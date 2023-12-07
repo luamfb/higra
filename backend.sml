@@ -18,6 +18,9 @@ fun get_vertex_info (id : Sema.VertexId) ([] : Sema.State) : Sema.VertexInfo =
 fun is_edge_directed (e_type : Sema.EdgeType) : bool =
   (e_type = Sema.ContDir) orelse (e_type = Sema.DottedDir)
 
+fun is_edge_dotted (e_type : Sema.EdgeType) : bool =
+  (e_type = Sema.Dotted) orelse (e_type = Sema.DottedDir)
+
 structure Backend = struct
   (* All dimensions are measured in pixels. *)
 
@@ -29,6 +32,9 @@ structure Backend = struct
 
   (* size of a directed edge's arrow head *)
   val arrow_size = 5
+
+  (* size of dashes and gaps in dotted edges *)
+  val dash_size = 2
 
   (* mapping of vertices drawing on screen and their bounding boxes *)
   type Drawing = (Sema.VertexId * Geom.Box) list
@@ -162,18 +168,26 @@ structure Backend = struct
         ^ " Z\" stroke=\"black\"/>"
       end
 
+  fun gen_dash_svg ((_, _, e_type, _) : Sema.Edge) : string =
+    if not (is_edge_dotted e_type) then
+      ""
+    else
+      " stroke-dasharray=\"" ^ (Int.toString dash_size) ^ "\""
+
   fun gen_edge_svg (edge : Sema.Edge)
     ((x1, y1) : Geom.Point) ((x2, y2) : Geom.Point) =
     let
       val (_, _, e_type, attr) = edge
       val arrowhead_svg = gen_arrowhead_svg edge (x1, y1) (x2, y2)
+      val dash_svg = gen_dash_svg edge
     in
-      (* TODO take edge color / type into account *)
+      (* TODO take edge color into account *)
       "<g class=\"edge\">\n<line x1=\"" ^ (Int.toString x1)
       ^ "\" y1 = \"" ^ (Int.toString y1)
       ^ "\" x2 = \"" ^ (Int.toString x2)
       ^ "\" y2 = \"" ^ (Int.toString y2)
-      ^ "\" stroke = \"black\"/>\n"
+      ^ "\"" ^ dash_svg
+      ^ " stroke = \"black\"/>\n"
       ^ arrowhead_svg ^ "\n</g>"
     end
 
@@ -186,14 +200,16 @@ structure Backend = struct
       val ((x0, y0), (x1, y1), (x2, y2), (x3, y3)) =
         Geom.compute_indirect_path from_box to_box edge_displ
       val arrowhead_svg = gen_arrowhead_svg edge (x2, y2) (x3, y3)
+      val dash_svg = gen_dash_svg edge
     in
-      (* TODO take edge color / type into account *)
+      (* TODO take edge color into account *)
       "<g class=\"indirect_edge\">\n<path d=\"M"
       ^ (Int.toString x0) ^ "," ^ (Int.toString y0)
       ^ " L" ^ (Int.toString x1) ^ "," ^ (Int.toString y1)
       ^ " L" ^ (Int.toString x2) ^ "," ^ (Int.toString y2)
       ^ " L" ^ (Int.toString x3) ^ "," ^ (Int.toString y3)
-      ^ "\" fill=\"none\" stroke=\"black\"/>\n"
+      ^ "\" fill=\"none\"" ^ dash_svg ^
+      " stroke=\"black\"/>\n"
       ^ arrowhead_svg ^ "\n</g>"
     end
 
