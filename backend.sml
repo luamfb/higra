@@ -1,9 +1,4 @@
-val xml_header = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
-
-(* TODO dynamically compute width / height based on drawing size *)
-val svg_header =
-  "<svg width=\"700\" height=\"700\" xmlns=\"http://www.w3.org/2000/svg\">"
-val svg_footer = "</svg>"
+val xml_header = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
 
 exception InternalError
 
@@ -265,18 +260,29 @@ structure Backend = struct
     end
 
   fun draw_edge_list [] (state : Sema.State) (fig_attr: Sema.FigAttrib)
-    (drawing : Drawing) : string = ""
-    | draw_edge_list ((e::es) : Sema.Edge list) state fig_attr drawing =
+    (drawing0 : Drawing) : Drawing * string = (drawing0, "")
+    | draw_edge_list ((e::es) : Sema.Edge list) state fig_attr drawing0 =
     let
-      val (new_drawing, edge_svg) = (draw_edge e state fig_attr drawing)
+      val (drawing1, edge_svg) = draw_edge e state fig_attr drawing0
+      val (drawing2, rest_svg) = draw_edge_list es state fig_attr drawing1
+      val full_svg = edge_svg ^ "\n" ^ rest_svg
     in
-      edge_svg ^ "\n" ^ (draw_edge_list es state fig_attr new_drawing)
+      (drawing2, full_svg)
     end
 
   fun draw_svg ((fig_attr, Sema.Graph (_, edges, graphs), state) : Sema.Figure)
     : string =
-    (* TODO also recurse for each subgraph *)
-    xml_header ^ "\n" ^ svg_header ^ "\n"
-    ^ (draw_edge_list edges state fig_attr [])
-    ^ svg_footer ^ "\n"
+    let
+      val (drawing, edges_svg) = draw_edge_list edges state fig_attr []
+      val (max_x, max_y) = Geom.box_list_max_dim (box_list_from drawing)
+      val fig_w = max_x + vertex_sep
+      val fig_h = max_y + vertex_sep
+      val svg_header =
+        "<svg width=\"" ^ (Int.toString fig_w)
+        ^ "\" height=\"" ^ (Int.toString fig_h)
+        ^ "\" xmlns=\"http://www.w3.org/2000/svg\">\n"
+    in
+      (* TODO also recurse for each subgraph *)
+      xml_header ^ svg_header ^ edges_svg ^ "</svg>\n"
+    end
 end
