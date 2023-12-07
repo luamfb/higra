@@ -250,6 +250,14 @@ structure Geom = struct
         end
     end
 
+  fun distance ((x1, y1) : Point) ((x2, y2) : Point) : real =
+  let
+    val delta_x = (Real.fromInt x2) - (Real.fromInt x1)
+    val delta_y = (Real.fromInt y2) - (Real.fromInt y1)
+  in
+    Math.sqrt (delta_x * delta_x + delta_y * delta_y)
+  end
+
   (* computes the arrowhead points of the edge going from one point
    * to another. *)
   fun arrowhead_points ((x_from, y_from) : Point) ((x_to, y_to) : Point)
@@ -268,6 +276,30 @@ structure Geom = struct
              ((x_to - size, y), (x_to + size, y))
            end
        | Oblique (slope, inv_slope, offset) =>
-           (* TODO *)
-           raise InternalError (*XXX*)
+           let
+             val edge_len = distance (x_from, y_from) (x_to, y_to)
+             (* from point `from` to the center of base of arrowhead *)
+             val base_dist = edge_len - (Real.fromInt size)
+             val base_delta_x = base_dist / (Math.sqrt (1.0 + slope*slope))
+             (* coordinates of center of base of arrowhead *)
+             val base_x =
+               if x_from < x_to then
+                 (Real.fromInt x_from) + base_delta_x
+               else
+                 (Real.fromInt x_from) - base_delta_x
+             val base_y = slope * base_x + offset
+             (* slope and offset of perpendicular line that goes through
+              * the center of base of arrowhead *)
+             val perp_slope = ~inv_slope
+             val perp_offset = base_y - perp_slope * base_x
+             (* from center of base of arrowhead to each base point *)
+             val delta_x =
+               (Real.fromInt size) / Math.sqrt (1.0 + perp_slope * perp_slope)
+             val x1 = base_x + delta_x
+             val x2 = base_x - delta_x
+             val y1 = perp_slope * x1 + perp_offset
+             val y2 = perp_slope * x2 + perp_offset
+           in
+             ((round x1, round y1), (round x2, round y2))
+           end
 end
