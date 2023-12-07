@@ -103,9 +103,8 @@ structure Backend = struct
              ^ "\" />\n"
            end
 
-  (* TODO take figure font into account *)
   fun gen_vertex_svg (id : Sema.VertexId) (box : Geom.Box) (label : string)
-    ((color, shape, fontsize) : Sema.VertexAttrib) : string =
+    ((color, shape, fontsize) : Sema.VertexAttrib) (font : string) : string =
     let
       val (center_x, center_y) = Geom.box_center box
     in
@@ -116,13 +115,16 @@ structure Backend = struct
       ^ "<text text-anchor=\"middle\" stroke-width=\"0\" x=\""
       ^ (Int.toString center_x)
       ^ "\" y =\"" ^ (Int.toString center_y)
-      ^ "\" font-family=\"Times\" font-size=\"" ^ (Int.toString fontsize)
+      ^ "\" font-family=\"" ^ font
+      ^ "\" font-size=\"" ^ (Int.toString fontsize)
       ^ "\">" ^ label ^ "</text>\n</g>"
     end
 
   fun draw_vertex (id : Sema.VertexId) (state : Sema.State) (drawing : Drawing)
-    (opt_near : Geom.Box option) : Drawing * Geom.Box * string =
+    (fig_attr : Sema.FigAttrib) (opt_near : Geom.Box option)
+    : Drawing * Geom.Box * string =
   let
+    val (font, _) = fig_attr
     val (label, v_attr) = get_vertex_info id state
 
     (* TODO compute dynamically depending on text length *)
@@ -135,44 +137,45 @@ structure Backend = struct
          | SOME near => place_vertex_near_to id drawing near (width, height)
 
     val box = (topleft_x, topleft_y, width, height)
-    val svg = gen_vertex_svg id box label v_attr
+    val svg = gen_vertex_svg id box label v_attr font
   in
     (new_drawing, box, svg)
   end
 
   fun draw_free_vertex (id : Sema.VertexId) (state : Sema.State)
-    (drawing : Drawing) : Drawing * Geom.Box * string =
-    draw_vertex id state drawing NONE
+    (fig_attr : Sema.FigAttrib) (drawing : Drawing)
+    : Drawing * Geom.Box * string =
+    draw_vertex id state drawing fig_attr NONE
 
   fun draw_vertex_near_to (id : Sema.VertexId) (near : Geom.Box)
-    (state : Sema.State) (drawing : Drawing)
+    (state : Sema.State) (fig_attr : Sema.FigAttrib) (drawing : Drawing)
     : Drawing * Geom.Box * string =
-    draw_vertex id state drawing (SOME near)
+    draw_vertex id state drawing fig_attr (SOME near)
 
   fun draw_vertices_if_needed ((v_from, v_to) : Sema.VertexId * Sema.VertexId)
-    (state : Sema.State) (drawing0 : Drawing)
+    (state : Sema.State) (fig_attr : Sema.FigAttrib) (drawing0 : Drawing)
     : Drawing * Geom.Box * Geom.Box * string =
     case (get_vertex_box v_from drawing0, get_vertex_box v_to drawing0) of
          (NONE, NONE) =>
          let
            val (drawing1, from_box, svg1) =
-             draw_free_vertex v_from state drawing0
+             draw_free_vertex v_from state fig_attr drawing0
            val (drawing2, to_box, svg2) =
-             draw_vertex_near_to v_to from_box state drawing1
+             draw_vertex_near_to v_to from_box state fig_attr drawing1
            in
              (drawing2, from_box, to_box, svg1 ^ "\n" ^ svg2)
            end
        | (SOME from_box, NONE) =>
            let
              val (drawing1, to_box, svg1) =
-               draw_vertex_near_to v_to from_box state drawing0
+               draw_vertex_near_to v_to from_box state fig_attr drawing0
            in
              (drawing1, from_box, to_box, svg1)
            end
        | (NONE, SOME to_box) =>
            let
              val (drawing1, from_box, svg1) =
-               draw_vertex_near_to v_from to_box state drawing0
+               draw_vertex_near_to v_from to_box state fig_attr drawing0
            in
              (drawing1, from_box, to_box, svg1)
            end
@@ -241,12 +244,12 @@ structure Backend = struct
       ^ arrowhead_svg ^ "\n</g>"
     end
 
-  fun draw_edge (edge : Sema.Edge)
-    (state : Sema.State) (drawing0 : Drawing) : Drawing * string =
+  fun draw_edge (edge : Sema.Edge) (state : Sema.State)
+    (fig_attr: Sema.FigAttrib) (drawing0 : Drawing) : Drawing * string =
     let
       val (v_from, v_to, e_type, attr) = edge
       val (drawing1, from_box, to_box, vertex_svg) =
-        draw_vertices_if_needed (v_from, v_to) state drawing0
+        draw_vertices_if_needed (v_from, v_to) state fig_attr drawing0
       val (p1, p2) = Geom.box_connector_line from_box to_box
       val box_list = box_list_from drawing1
       val edge_svg =
@@ -258,19 +261,19 @@ structure Backend = struct
       (drawing1, vertex_svg ^ "\n" ^ edge_svg)
     end
 
-  fun draw_edge_list [] (state : Sema.State) (drawing : Drawing)
-    : string = ""
-    | draw_edge_list ((e::es) : Sema.Edge list) state drawing =
+  fun draw_edge_list [] (state : Sema.State) (fig_attr: Sema.FigAttrib)
+    (drawing : Drawing) : string = ""
+    | draw_edge_list ((e::es) : Sema.Edge list) state fig_attr drawing =
     let
-      val (new_drawing, edge_svg) = (draw_edge e state drawing)
+      val (new_drawing, edge_svg) = (draw_edge e state fig_attr drawing)
     in
-      edge_svg ^ "\n" ^ (draw_edge_list es state new_drawing)
+      edge_svg ^ "\n" ^ (draw_edge_list es state fig_attr new_drawing)
     end
 
   fun draw_svg ((fig_attr, Sema.Graph (_, edges, graphs), state) : Sema.Figure)
     : string =
     (* TODO also recurse for each subgraph *)
     xml_header ^ "\n" ^ svg_header ^ "\n"
-    ^ (draw_edge_list edges state [])
+    ^ (draw_edge_list edges state fig_attr [])
     ^ svg_footer ^ "\n"
 end
