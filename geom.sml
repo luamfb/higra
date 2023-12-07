@@ -24,14 +24,15 @@ structure Geom = struct
       (max_x, max_y)
     end
 
-  fun next_free_topleft (sep : int) (box_list : Box list) : Point =
+  fun next_free_topleft (sep : int) (box_list : Box list) (horiz : bool)
+    : Point =
   let
-    (* TODO take horizontal into account *)
-    val (max_x, _) = box_list_max_dim box_list
-    val x = if max_x > 0 then max_x + sep else 0
-    val y = 0
+    val (max_x, max_y) = box_list_max_dim box_list
   in
-    (x, y)
+    if horiz then
+      (max_x + sep, sep)
+    else
+      (sep, max_y + sep)
   end
 
   fun point_right_to (sep : int) (near : Box) : Point =
@@ -80,26 +81,29 @@ structure Geom = struct
       box_is_free box rest
 
   fun free_box_near_to (sep : int) (near : Box) (width: int, height: int)
-    (box_list : Box list) : Box =
+    (box_list : Box list) (horiz : bool) : Box =
     let
       val (x_r, y_r) = point_right_to sep near
       val (x_d, y_d) = point_down_to sep near
       val box_r = (x_r, y_r, width, height)
       val box_d = (x_d, y_d, width, height)
-    in
-      (* TODO reverse if horizontal is false *)
-      if (box_is_free box_r box_list) then
-        box_r
-      else
-        if (box_is_free box_d box_list) then
-          box_d
+      val (primary, secondary) =
+        if horiz then
+          (box_r, box_d)
         else
-          (* FIXME should try diagonals as well *)
-          let
-            val (next_x, next_y) = next_free_topleft sep box_list
-          in
-            (next_x, next_y, width, height)
-          end
+          (box_d, box_r)
+    in
+      if (box_is_free primary box_list) then
+        primary
+      else if (box_is_free secondary box_list) then
+        secondary
+      else
+        (* FIXME should try diagonals as well *)
+        let
+          val (next_x, next_y) = next_free_topleft sep box_list horiz
+        in
+          (next_x, next_y, width, height)
+        end
     end
 
   (* get (left, top, right, bottom) coordinates of a box *)

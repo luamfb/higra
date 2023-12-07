@@ -59,9 +59,10 @@ structure Backend = struct
   (* always tries to walk towards the primary dimension:
    * left if horizontal is true, down otherwise *)
   fun place_free_vertex (id : Sema.VertexId) (drawing : Drawing)
-    ((width, height) : int * int) : Drawing * Geom.Point =
+    ((width, height) : int * int) (horiz : bool) : Drawing * Geom.Point =
     let
-      val (x, y) = Geom.next_free_topleft vertex_sep (box_list_from drawing)
+      val (x, y) =
+        Geom.next_free_topleft vertex_sep (box_list_from drawing) horiz
       val box : Geom.Box = (x, y, width, height)
       val new_drawing : Drawing = (id, box)::drawing
     in
@@ -69,11 +70,12 @@ structure Backend = struct
     end
 
   fun place_vertex_near_to (id : Sema.VertexId) (drawing : Drawing)
-    (near : Geom.Box) ((width, height) : int * int) : Drawing * Geom.Point =
+    (near : Geom.Box) ((width, height) : int * int) (horiz : bool)
+    : Drawing * Geom.Point =
     let
       val box_list = box_list_from drawing
       val box =
-        Geom.free_box_near_to vertex_sep near (width, height) box_list
+        Geom.free_box_near_to vertex_sep near (width, height) box_list horiz
       val (x, y, _, _) = box
       val new_drawing : Drawing = (id, box)::drawing
     in
@@ -124,7 +126,7 @@ structure Backend = struct
     (fig_attr : Sema.FigAttrib) (opt_near : Geom.Box option)
     : Drawing * Geom.Box * string =
   let
-    val (font, _) = fig_attr
+    val (font, horiz) = fig_attr
     val (label, v_attr) = get_vertex_info id state
 
     (* TODO compute dynamically depending on text length *)
@@ -133,8 +135,9 @@ structure Backend = struct
 
     val (new_drawing, (topleft_x, topleft_y)) =
       case opt_near of
-           NONE => place_free_vertex id drawing (width, height)
-         | SOME near => place_vertex_near_to id drawing near (width, height)
+           NONE => place_free_vertex id drawing (width, height) horiz
+         | SOME near =>
+             place_vertex_near_to id drawing near (width, height) horiz
 
     val box = (topleft_x, topleft_y, width, height)
     val svg = gen_vertex_svg id box label v_attr font
