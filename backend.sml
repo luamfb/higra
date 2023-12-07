@@ -39,6 +39,12 @@ structure Backend = struct
   (* mapping of vertices drawing on screen and their bounding boxes *)
   type Drawing = (Sema.VertexId * Geom.Box) list
 
+  fun gen_color_svg ((r,g,b) : Sema.Color) : string =
+    "rgb("
+    ^ (Int.toString r) ^ ","
+    ^ (Int.toString g) ^ ","
+    ^ (Int.toString b) ^ ")"
+
   fun box_list_from ([] : Drawing) : Geom.Box list = []
     | box_list_from ((_, box):: rest) = box::(box_list_from rest)
 
@@ -152,8 +158,7 @@ structure Backend = struct
        | (SOME from_box, SOME to_box) =>
            (drawing0, from_box, to_box, "")
 
-  (* TODO take color into account *)
-  fun gen_arrowhead_svg ((_, _, e_type, attr) : Sema.Edge)
+  fun gen_arrowhead_svg ((_, _, e_type, _) : Sema.Edge)
     (from : Geom.Point) (to : Geom.Point) : string =
     if not (is_edge_directed e_type) then
       ""
@@ -165,7 +170,7 @@ structure Backend = struct
         "<path d=\"M" ^ (Int.toString x0) ^ "," ^ (Int.toString y0)
         ^ " L" ^ (Int.toString x1) ^ "," ^ (Int.toString y1)
         ^ " L" ^ (Int.toString x2) ^ "," ^ (Int.toString y2)
-        ^ " Z\" stroke=\"black\"/>"
+        ^ " Z\"/>\n"
       end
 
   fun gen_dash_svg ((_, _, e_type, _) : Sema.Edge) : string =
@@ -180,14 +185,15 @@ structure Backend = struct
       val (_, _, e_type, attr) = edge
       val arrowhead_svg = gen_arrowhead_svg edge (x1, y1) (x2, y2)
       val dash_svg = gen_dash_svg edge
+      val color_svg = gen_color_svg attr
     in
-      (* TODO take edge color into account *)
-      "<g class=\"edge\">\n<line x1=\"" ^ (Int.toString x1)
+      "<g class=\"edge\" stroke=\""
+      ^ color_svg ^ "\" fill=\""
+      ^ color_svg ^ "\">\n<line x1=\"" ^ (Int.toString x1)
       ^ "\" y1 = \"" ^ (Int.toString y1)
       ^ "\" x2 = \"" ^ (Int.toString x2)
       ^ "\" y2 = \"" ^ (Int.toString y2)
-      ^ "\"" ^ dash_svg
-      ^ " stroke = \"black\"/>\n"
+      ^ "\"" ^ dash_svg ^ "/>"
       ^ arrowhead_svg ^ "\n</g>"
     end
 
@@ -201,15 +207,16 @@ structure Backend = struct
         Geom.compute_indirect_path from_box to_box edge_displ
       val arrowhead_svg = gen_arrowhead_svg edge (x2, y2) (x3, y3)
       val dash_svg = gen_dash_svg edge
+      val color_svg = gen_color_svg attr
     in
-      (* TODO take edge color into account *)
-      "<g class=\"indirect_edge\">\n<path d=\"M"
+      "<g class=\"indirect_edge\" stroke=\""
+      ^ color_svg ^ "\" fill=\""
+      ^ color_svg ^ "\">\n<path d=\"M"
       ^ (Int.toString x0) ^ "," ^ (Int.toString y0)
       ^ " L" ^ (Int.toString x1) ^ "," ^ (Int.toString y1)
       ^ " L" ^ (Int.toString x2) ^ "," ^ (Int.toString y2)
       ^ " L" ^ (Int.toString x3) ^ "," ^ (Int.toString y3)
-      ^ "\" fill=\"none\"" ^ dash_svg ^
-      " stroke=\"black\"/>\n"
+      ^ "\" fill=\"none\"" ^ dash_svg ^ "/>\n"
       ^ arrowhead_svg ^ "\n</g>"
     end
 
