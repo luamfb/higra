@@ -80,18 +80,28 @@ structure Backend = struct
       (new_drawing, (x, y))
     end
 
-  (* TODO take vertex attributes into account *)
-  fun gen_vertex_svg (id : Sema.VertexId) ((v_x, v_y) : int * int)
-    ((vertex_rx, vertex_ry) : int * int) (label : string) =
-    "<g id=\"" ^ id ^ "\" class=\"vertex\">\n"
-    ^ "<ellipse fill=\"none\" stroke=\"black\" cx=\"" ^ (Int.toString v_x)
+  (* TODO take vertex shape into account *)
+  (* TODO take figure font into account *)
+  fun gen_vertex_svg (id : Sema.VertexId)
+    ((v_x, v_y) : int * int)
+    ((vertex_rx, vertex_ry) : int * int)
+    (label : string)
+    ((color, shape, fontsize) : Sema.VertexAttrib)
+    =
+    "<g id=\"" ^ id ^ "\" class=\"vertex\" stroke=\""
+    ^ (gen_color_svg color) ^ "\" fill=\""
+    ^ (gen_color_svg color)
+    ^ "\">\n"
+    ^ "<ellipse fill=\"none\" cx=\"" ^ (Int.toString v_x)
     ^ "\" cy=\"" ^ (Int.toString v_y)
     ^ "\" rx=\"" ^ (Int.toString vertex_rx)
     ^ "\" ry=\"" ^ (Int.toString vertex_ry)
-    ^ "\" />\n<text text-anchor=\"middle\" x=\"" ^ (Int.toString v_x)
+    ^ "\" />\n"
+    ^ "<text text-anchor=\"middle\" stroke-width=\"0\" x=\""
+    ^ (Int.toString v_x)
     ^ "\" y =\"" ^ (Int.toString v_y)
-    ^ "\" font-family=\"Times\" font-size=\"14\">" ^ label ^ "</text>\n"
-    ^ "</g>"
+    ^ "\" font-family=\"Times\" font-size=\"" ^ (Int.toString fontsize)
+    ^ "\">" ^ label ^ "</text>\n</g>"
 
   fun draw_vertex (id : Sema.VertexId) (state : Sema.State) (drawing : Drawing)
     (opt_near : Geom.Box option) : Drawing * Geom.Box * string =
@@ -113,7 +123,7 @@ structure Backend = struct
     val v_x = v_topleft_x + (width div 2)
     val v_y = v_topleft_y + (height div 2)
 
-    val svg = gen_vertex_svg id (v_x, v_y) (vertex_rx, vertex_ry) label
+    val svg = gen_vertex_svg id (v_x, v_y) (vertex_rx, vertex_ry) label v_attr
     val box = (v_topleft_x, v_topleft_y, width, height)
   in
     (new_drawing, box, svg)
