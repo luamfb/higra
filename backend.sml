@@ -246,9 +246,13 @@ structure Backend = struct
     (fig_attr: Sema.FigAttrib) (drawing0 : Drawing) : Drawing * string =
     let
       val (v_from, v_to, e_type, attr) = edge
+      val (_, (_, from_shape, _)) = get_vertex_info v_from state
+      val (_, (_, to_shape, _)) = get_vertex_info v_to state
+
       val (drawing1, from_box, to_box, vertex_svg) =
         draw_vertices_if_needed (v_from, v_to) state fig_attr drawing0
-      val (p1, p2) = Geom.box_connector_line from_box to_box
+      val (p1, p2) =
+        Geom.box_connector_line from_box from_shape to_box to_shape
       val box_list = box_list_from drawing1
       val edge_svg =
         if Geom.line_segment_is_free p1 p2 box_list then

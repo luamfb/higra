@@ -204,20 +204,84 @@ structure Geom = struct
         line_segment_is_free p1 p2 rest
     end
 
-  (* gets the coordinates of a line connecting the boxes *)
-  fun box_connector_line (box1 : Box) (box2 : Box) : Point * Point =
+  fun distance_sq_int ((x1, y1) : Point) ((x2, y2) : Point) : int =
   let
-    (*
-    val (left1, top1, right1, bot1) = box_coords box1
-    val (left2, top2, right2, bot2) = box_coords box2
-    *)
+    val delta_x = x2 - x1
+    val delta_y = y2 - y1
+  in
+    delta_x * delta_x + delta_y * delta_y
+  end
+
+  (* choose P1 or P2 depending on which has the smallest distance to P *)
+  fun point_closest_to (p1 : Point) (p2 : Point) (p : Point) : Point =
+    if (distance_sq_int p1 p) < (distance_sq_int p2 p) then
+      p1
+    else
+      p2
+
+  (* gives the two solutions for a quadratic equation ax^2 + bx + c = 0
+   * Assumes a != 0 and delta > 0 *)
+  fun quadratic_equation (a : real) (b : real) (c : real) : real * real =
+  let
+    val delta = b*b - 4.0*a*c
+    val root_delta = if not (delta > 0.0) then
+      raise InternalError
+    else
+      Math.sqrt delta
+    val ans1 = (~b + root_delta) / (2.0 * a)
+    val ans2 = (~b - root_delta) / (2.0 * a)
+  in
+    (ans1, ans2)
+  end
+
+  (* compute the intersection point closest to the given point P
+   * between line and the ellipse bounded by box.
+   *)
+  fun line_ellipse_intersection (box : Box) (line : Line) (p : Point)
+    : Point =
+    case line of
+         ((Horizontal _) | (Vertical _)) =>
+           line_box_intersection box line p
+       | (Oblique (m, _, offset)) =>
+           let
+             val (int_x_c, int_y_c) = box_center box
+             val x_c = Real.fromInt int_x_c
+             val y_c = Real.fromInt int_y_c
+             val (_, _, width, height) = box
+             (* approximate ellipse as a circle with diameter equal to
+              * the average of the width and height of the bounding box,
+              * and the radius is half of that *)
+             val r = ((Real.fromInt width) + (Real.fromInt height)) / 4.0
+             val a = ~x_c
+             val b = offset - y_c
+             val coef1 = m*m + 1.0
+             val coef2 = 2.0*a + 2.0*m*b
+             val coef3 = a*a + b*b - r*r
+             val (x1, x2) = quadratic_equation coef1 coef2 coef3
+             val y1 = m * x1 + offset
+             val y2 = m * x2 + offset
+             val p1 = (round x1, round y1)
+             val p2 = (round x2, round y2)
+           in
+             point_closest_to p1 p2 p
+           end
+
+  fun line_vertex_intersection (box : Box) (shape : Sema.Shape)
+    (line : Line) (p : Point) : Point =
+    case shape of
+         Sema.Rect => line_box_intersection box line p
+       | Sema.Circle => line_ellipse_intersection box line p
+
+  (* gets the coordinates of a line connecting the boxes *)
+  fun box_connector_line (box1 : Box) (shape1 : Sema.Shape)
+    (box2 : Box) (shape2 : Sema.Shape) : Point * Point =
+  let
     val center1 = box_center box1
     val center2 = box_center box2
     val line = line_between center1 center2
 
-    (* TODO take vertex shape into account *)
-    val p1 = line_box_intersection box1 line center2
-    val p2 = line_box_intersection box2 line center1
+    val p1 = line_vertex_intersection box1 shape1 line center2
+    val p2 = line_vertex_intersection box2 shape2 line center1
   in
       (p1, p2)
   end
@@ -254,13 +318,8 @@ structure Geom = struct
         end
     end
 
-  fun distance ((x1, y1) : Point) ((x2, y2) : Point) : real =
-  let
-    val delta_x = (Real.fromInt x2) - (Real.fromInt x1)
-    val delta_y = (Real.fromInt y2) - (Real.fromInt y1)
-  in
-    Math.sqrt (delta_x * delta_x + delta_y * delta_y)
-  end
+  fun distance (p1 : Point) (p2 : Point) : real =
+    Math.sqrt (Real.fromInt (distance_sq_int p1 p2))
 
   (* computes the arrowhead points of the edge going from one point
    * to another. *)
