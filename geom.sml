@@ -53,6 +53,15 @@ structure Geom = struct
     (next_x, next_y)
   end
 
+  fun point_diag_to (sep : int) (near : Box) : Point =
+  let
+    val (near_x, near_y, near_w, near_h) = near
+    val next_x = near_x + near_w + sep
+    val next_y = near_y + near_h + sep
+  in
+    (next_x, next_y)
+  end
+
   fun box_intersects ((left1,top1,w1,h1) : Box) ((left2,top2,w2,h2) : Box)
     : bool =
   let
@@ -85,6 +94,7 @@ structure Geom = struct
     let
       val (x_r, y_r) = point_right_to sep near
       val (x_d, y_d) = point_down_to sep near
+      val (x_diag, y_diag) = point_diag_to sep near
       val box_r = (x_r, y_r, width, height)
       val box_d = (x_d, y_d, width, height)
       val (primary, secondary) =
@@ -92,13 +102,16 @@ structure Geom = struct
           (box_r, box_d)
         else
           (box_d, box_r)
+      val tertiary = (x_diag, y_diag, width, height)
     in
       if (box_is_free primary box_list) then
         primary
       else if (box_is_free secondary box_list) then
         secondary
+      else if (box_is_free tertiary box_list) then
+        tertiary
       else
-        (* FIXME should try diagonals as well *)
+        (* vertex can't be position nearby; place it as if it was free *)
         let
           val (next_x, next_y) = next_free_topleft sep box_list horiz
         in
