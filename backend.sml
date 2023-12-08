@@ -274,8 +274,9 @@ structure Backend = struct
       (drawing2, full_svg)
     end
 
-  fun draw_svg ((fig_attr, Sema.Graph (_, edges, graphs), state) : Sema.Figure)
-    : string =
+  (* meant to draw only edges of current graph, not subgraphs *)
+  fun draw_svg (edges : Sema.Edge list) (state : Sema.State)
+    (fig_attr : Sema.FigAttrib) : string =
     let
       val (drawing, edges_svg) = draw_edge_list edges state fig_attr []
       val (max_x, max_y) = Geom.box_list_max_dim (box_list_from drawing)
@@ -290,7 +291,22 @@ structure Backend = struct
         ^ " " ^ (Int.toString fig_h)
         ^ "\" xmlns=\"http://www.w3.org/2000/svg\">\n"
     in
-      (* TODO also recurse for each subgraph *)
       xml_header ^ svg_header ^ edges_svg ^ "</svg>\n"
     end
+
+  fun draw_graph (Sema.Graph (_, [], [])) (state : Sema.State)
+    (fig_attr : Sema.FigAttrib)
+    : string list = []
+    | draw_graph (Sema.Graph (_, edges, [])) state fig_attr =
+    (draw_svg edges state fig_attr)::[]
+    | draw_graph (Sema.Graph (_, edges, graphs)) state fig_attr =
+    (draw_svg edges state fig_attr)::(draw_subgraphs graphs state fig_attr)
+  and draw_subgraphs ([] : Sema.Graph list) (state : Sema.State)
+    (fig_attr : Sema.FigAttrib)
+    : string list = []
+    | draw_subgraphs (g::gs) state fig_attr =
+    (draw_graph g state fig_attr) @ (draw_subgraphs gs state fig_attr)
+
+  fun draw_figure ((attr, full_graph, state) : Sema.Figure) : string list =
+    draw_graph full_graph state attr
 end

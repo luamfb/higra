@@ -189,8 +189,18 @@ structure Debug = struct
 
   (*** BACKEND ***)
 
+  fun print_str_list ([] : string list) : unit = ()
+    | print_str_list (str :: rest) =
+    let
+      val _ = print "--------------------------------------------------\n"
+      val _ = print str
+      val _ = print "\n"
+    in
+      print_str_list rest
+    end
+
   fun debug_backend (s: string) =
-    print (Backend.draw_svg
+    print_str_list (Backend.draw_figure
       (Sema.sema_figure (Parser.parse_figure (Lexer.tokenize s))))
     handle
       Sema.SemaError (pos_start, pos_end) =>
