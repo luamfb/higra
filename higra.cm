@@ -11,10 +11,10 @@ Library
 is
     $/basis.cm
     $/smlnj-lib.cm
-    main.sml
-    debug.sml
-    lexer.sml
-    parser.sml
-    sema.sml
-    backend.sml
-    geom.sml
+    src/main.sml
+    src/debug.sml
+    src/lexer.sml
+    src/parser.sml
+    src/sema.sml
+    src/backend.sml
+    src/geom.sml
