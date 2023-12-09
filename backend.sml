@@ -220,13 +220,13 @@ structure Backend = struct
     end
 
   (* an indirect edge takes a "detour" because another vertex is in
-   * the way of a direct edge joining the vertices' centers *)
+   * the way of a direct edge joining the vertices' centers,
+   * or because the vertex has an edge to itself *)
   fun gen_indirect_edge_svg (edge : Sema.Edge)
-    (from_box : Geom.Box) (to_box : Geom.Box) =
+    (((x0, y0), (x1, y1), (x2, y2), (x3, y3))
+    : Geom.Point * Geom.Point * Geom.Point * Geom.Point) : string =
     let
       val (_, _, e_type, attr) = edge
-      val ((x0, y0), (x1, y1), (x2, y2), (x3, y3)) =
-        Geom.compute_indirect_path from_box to_box edge_displ
       val arrowhead_svg = gen_arrowhead_svg edge (x2, y2) (x3, y3)
       val dash_svg = gen_dash_svg edge
       val color_svg = gen_color_svg attr
@@ -242,7 +242,7 @@ structure Backend = struct
       ^ arrowhead_svg ^ "\n</g>"
     end
 
-  fun draw_edge (edge : Sema.Edge) (state : Sema.State)
+  fun draw_non_self_edge (edge : Sema.Edge) (state : Sema.State)
     (fig_attr: Sema.FigAttrib) (drawing0 : Drawing) : Drawing * string =
     let
       val (v_from, v_to, e_type, attr) = edge
@@ -258,9 +258,36 @@ structure Backend = struct
         if Geom.line_segment_is_free p1 p2 box_list then
           gen_edge_svg edge p1 p2
         else
-          gen_indirect_edge_svg edge from_box to_box
+          gen_indirect_edge_svg edge
+          (Geom.compute_indirect_path from_box to_box edge_displ)
     in
       (drawing1, vertex_svg ^ "\n" ^ edge_svg)
+    end
+
+  fun draw_self_edge
+    ((v, e_type, attr) : Sema.VertexId * Sema.EdgeType * Sema.EdgeAttrib)
+    (state : Sema.State) (fig_attr: Sema.FigAttrib) (drawing0 : Drawing)
+    : Drawing * string =
+    let
+      val (drawing1, v_box, svg1) =
+        case (get_vertex_box v drawing0) of
+             NONE => draw_free_vertex v state fig_attr drawing0
+           | SOME box => (drawing0, box, "")
+      val points = Geom.compute_self_edge_path v_box edge_displ
+      val svg2 = gen_indirect_edge_svg (v, v, e_type, attr) points
+    in
+      (drawing1, (svg1 ^ "\n" ^ svg2))
+    end
+
+  fun draw_edge (edge : Sema.Edge) (state : Sema.State)
+    (fig_attr: Sema.FigAttrib) (drawing : Drawing) : Drawing * string =
+    let
+      val (v_from, v_to, e_type, attr) = edge
+    in
+      if v_from = v_to then
+        draw_self_edge (v_from, e_type, attr) state fig_attr drawing
+      else
+        draw_non_self_edge edge state fig_attr drawing
     end
 
   fun draw_edge_list [] (state : Sema.State) (fig_attr: Sema.FigAttrib)

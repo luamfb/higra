@@ -331,6 +331,20 @@ structure Geom = struct
         end
     end
 
+  fun compute_self_edge_path (box : Box) (displ : int)
+    : Point * Point * Point * Point =
+    let
+      val (left, top, width, height) = box
+      val (_, _, right, bot) = box_coords box
+      val (x_center, y_center) = box_center box
+      val (x0, y0) = (right, y_center)
+      val (x3, y3) = (x_center, bot)
+      val (x2, y2) = (x3, y3 + displ)
+      val (x1, y1) = (x0, y2)
+    in
+      ((x0, y0), (x1, y1), (x2, y2), (x3, y3))
+    end
+
   fun distance (p1 : Point) (p2 : Point) : real =
     Math.sqrt (Real.fromInt (distance_sq_int p1 p2))
 
