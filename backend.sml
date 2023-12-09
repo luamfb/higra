@@ -296,17 +296,22 @@ structure Backend = struct
 
   fun draw_graph (Sema.Graph (_, [], [])) (state : Sema.State)
     (fig_attr : Sema.FigAttrib)
-    : string list = []
-    | draw_graph (Sema.Graph (_, edges, [])) state fig_attr =
-    (draw_svg edges state fig_attr)::[]
-    | draw_graph (Sema.Graph (_, edges, graphs)) state fig_attr =
-    (draw_svg edges state fig_attr)::(draw_subgraphs graphs state fig_attr)
+    : (Sema.VertexId * string) list = []
+    | draw_graph (Sema.Graph (id, edges, [])) state fig_attr =
+    (id, (draw_svg edges state fig_attr))::[]
+    | draw_graph (Sema.Graph (id, edges, graphs)) state fig_attr =
+    let
+      val current_svg = (id, (draw_svg edges state fig_attr))
+    in
+        current_svg::(draw_subgraphs graphs state fig_attr)
+    end
   and draw_subgraphs ([] : Sema.Graph list) (state : Sema.State)
     (fig_attr : Sema.FigAttrib)
-    : string list = []
+    : (Sema.VertexId * string) list = []
     | draw_subgraphs (g::gs) state fig_attr =
     (draw_graph g state fig_attr) @ (draw_subgraphs gs state fig_attr)
 
-  fun draw_figure ((attr, full_graph, state) : Sema.Figure) : string list =
+  fun draw_figure ((attr, full_graph, state) : Sema.Figure)
+    : (Sema.VertexId * string) list =
     draw_graph full_graph state attr
 end
