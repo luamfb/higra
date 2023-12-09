@@ -1,0 +1,9 @@
+[font="Arial",horiz=false]
+a "v1" -> b [color=#FF0000];
+a .. c "v2" [shape="rect"];
+a -- d [fontsize=20];
+a .> [color=#00FF00] e [color=#800080];
+c .. [color=#0000FF] d;
+d .> d;
+b -> e;
+e -> b;

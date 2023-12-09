@@ -2,7 +2,8 @@ val xml_header = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
 
 exception InternalError
 
-fun get_vertex_info (id : Sema.VertexId) ([] : Sema.State) : Sema.VertexInfo =
+fun get_vertex_info (id : Sema.VertexId) ([] : Sema.State)
+  : Sema.VertexInfo =
   raise InternalError
   | get_vertex_info id ((name, info)::rest) =
   if name = id then

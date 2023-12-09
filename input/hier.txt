@@ -1,0 +1,35 @@
+start -> a0;
+start -> b0;
+a2 -> end;
+b2 -> end;
+a {
+    a0 -> a1;
+    a1 -> a2;
+    a0 -> aa0;
+    a0 -> b1;
+    aa0 -> a1;
+    b0 -> a2;
+    aa {
+        aa0 -> aa1;
+    }
+    ab {
+        ab0 -> ab1;
+        ab1 -> ab2;
+    }
+}
+
+b {
+    b0 -> b1;
+    b1 -> b1;
+    b1 -> b2;
+    b0 -> a2;
+    bb0 -> b0;
+    bb3 -> b2;
+    b2 -> bb1;
+
+    bb {
+        bb0 -> bb1;
+        bb1 -> bb2;
+        bb2 -> bb3;
+    }
+}
